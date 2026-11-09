@@ -129,9 +129,9 @@ object CardPdfGenerator {
         if (text.isBlank()) return
         // 外层已经把单元格一分为二来画英文和中文，这里用整个单元格宽度的一半高度区域
         val usableH = areaH
-        var size = 72f
+        var size = 54f
         var layout: StaticLayout? = null
-        while (size > 12f) {
+        while (size > 10f) {
             basePaint.textSize = size
             val l = buildLayout(text, basePaint, areaW.toInt())
             if (l.height <= usableH && l.width <= areaW + 1) {
@@ -140,7 +140,7 @@ object CardPdfGenerator {
             }
             size -= 2f
         }
-        val l = layout ?: buildLayout(text, basePaint.apply { textSize = 12f }, areaW.toInt())
+        val l = layout ?: buildLayout(text, basePaint.apply { textSize = 10f }, areaW.toInt())
         canvas.save()
         val translateY = centerY - l.height / 2f
         canvas.translate(areaLeft, translateY)
