@@ -61,12 +61,30 @@ object CardPdfGenerator {
         return if (mode == PdfLayoutMode.SPLIT) {
             val list = ArrayList<CellContent>(cards.size * 2)
             cards.forEach {
-                list.add(CellContent(it.english))
-                list.add(CellContent(it.chinese))
+                list.add(CellContent(formatCellText(it.english)))
+                list.add(CellContent(formatCellText(it.chinese)))
             }
             list
         } else {
-            cards.map { CellContent(it.english, it.chinese) }
+            cards.map {
+                CellContent(formatCellText(it.english), formatCellText(it.chinese))
+            }
+        }
+    }
+
+    /**
+     * PDF 排版用的智能处理：把内容里的中英文逗号（, 与 ，）当作分隔符，
+     * 每个片段单独成行，并且不再显示逗号本身。
+     * 例："a, an"  ->  "a\nan"；"你好，世界"  ->  "你好\n世界"。
+     * 仅影响 PDF 输出，App 界面里仍显示原始文本。
+     */
+    fun formatCellText(text: String): String {
+        if (!text.contains(',') && !text.contains('，')) return text
+        val parts = text.split(',', '，').map { it.trim() }.filter { it.isNotEmpty() }
+        return when {
+            parts.isEmpty() -> ""
+            parts.size == 1 -> parts[0]
+            else -> parts.joinToString("\n")
         }
     }
 
