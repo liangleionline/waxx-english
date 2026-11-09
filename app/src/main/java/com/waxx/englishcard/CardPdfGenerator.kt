@@ -13,11 +13,18 @@ import java.io.File
 
 /**
  * 生成 A4 纸 4×4 共 16 格英文学习卡片 PDF。
- * 规则：
+ *
+ * 通用规则：
  * - A4 纸张，无页边距；
  * - 内部 3 条横线 + 3 条竖线，全部顶到纸张边缘，整体无外边框；
  * - 单元格内容水平居中 + 垂直居中，长文本自动换行并按需缩小字号；
- * - 每 16 格一页，自动分页。
+ * - 每页 16 格，自动分页；填充顺序为从上到下、从左到右。
+ *
+ * 两种排版模式（设置页可切换）：
+ * - [PdfLayoutMode.SPLIT]：英文、中文交替占用独立单元格。第 1 格英文、第 2 格中文、
+ *   第 3 格英文、第 4 格中文……每页 16 格 = 8 张卡片（默认）。
+ * - [PdfLayoutMode.COMBINED]：每格上半部分英文、下半部分中文，一格一张卡片，
+ *   每页 16 格 = 16 张卡片。
  */
 object CardPdfGenerator {
 
@@ -31,7 +38,44 @@ object CardPdfGenerator {
     private const val LINE_WIDTH = 3f
     private const val CELL_PADDING = 26f
 
-    fun generate(context: Context, cards: List<CardItem>, outFile: File): File {
+    enum class PdfLayoutMode {
+        /** 英文/中文交替独立占格（默认） */
+        SPLIT,
+        /** 每格英文+中文合在一起 */
+        COMBINED
+    }
+
+    /** 一个单元格要绘制的内容：secondary 为空表示整格只放一段文字。 */
+    private data class CellContent(val primary: String, val secondary: String? = null)
+
+    fun cellsPerPage(mode: PdfLayoutMode): Int =
+        if (mode == PdfLayoutMode.SPLIT) CELLS_PER_PAGE / 2 else CELLS_PER_PAGE
+
+    fun pageCount(cardCount: Int, mode: PdfLayoutMode): Int {
+        if (cardCount <= 0) return 0
+        val per = cellsPerPage(mode)
+        return (cardCount + per - 1) / per
+    }
+
+    private fun buildCells(cards: List<CardItem>, mode: PdfLayoutMode): List<CellContent> {
+        return if (mode == PdfLayoutMode.SPLIT) {
+            val list = ArrayList<CellContent>(cards.size * 2)
+            cards.forEach {
+                list.add(CellContent(it.english))
+                list.add(CellContent(it.chinese))
+            }
+            list
+        } else {
+            cards.map { CellContent(it.english, it.chinese) }
+        }
+    }
+
+    fun generate(
+        context: Context,
+        cards: List<CardItem>,
+        outFile: File,
+        mode: PdfLayoutMode = PdfLayoutMode.SPLIT
+    ): File {
         val doc = PdfDocument()
         val baseTypeface = loadTypeface(context)
         val linePaint = Paint().apply {
@@ -46,7 +90,8 @@ object CardPdfGenerator {
             isAntiAlias = true
         }
 
-        val pages = if (cards.isEmpty()) 0 else (cards.size + CELLS_PER_PAGE - 1) / CELLS_PER_PAGE
+        val cells = buildCells(cards, mode)
+        val pages = if (cells.isEmpty()) 1 else (cells.size + CELLS_PER_PAGE - 1) / CELLS_PER_PAGE
         val cellW = PAGE_W.toFloat() / COLS
         val cellH = PAGE_H.toFloat() / ROWS
 
@@ -65,43 +110,40 @@ object CardPdfGenerator {
                 canvas.drawLine(x, 0f, x, PAGE_H.toFloat(), linePaint)
             }
 
-            // 填内容：从上到下、从左到右
             for (idx in 0 until CELLS_PER_PAGE) {
                 val globalIndex = p * CELLS_PER_PAGE + idx
-                if (globalIndex >= cards.size) break
-                val card = cards[globalIndex]
+                if (globalIndex >= cells.size) break
+                val cell = cells[globalIndex]
                 val col = idx % COLS
                 val row = idx / COLS
                 val left = col * cellW
                 val top = row * cellH
-                // 英文占单元格上半部分，中文占下半部分，各自水平+垂直居中
-                drawCellText(
-                    canvas, card.english, textPaint,
-                    left + CELL_PADDING, top + CELL_PADDING,
-                    cellW - CELL_PADDING * 2, cellH / 2f - CELL_PADDING * 2,
-                    left + cellW / 2f, top + cellH / 4f
-                )
-                drawCellText(
-                    canvas, card.chinese, textPaint,
-                    left + CELL_PADDING, top + cellH / 2f,
-                    cellW - CELL_PADDING * 2, cellH / 2f - CELL_PADDING * 2,
-                    left + cellW / 2f, top + cellH * 3f / 4f
-                )
+
+                if (cell.secondary == null) {
+                    // 整格单段文字（英文或中文单占一格）：铺满整个单元格居中
+                    drawCellText(
+                        canvas, cell.primary, textPaint,
+                        left + CELL_PADDING, top + CELL_PADDING,
+                        cellW - CELL_PADDING * 2, cellH - CELL_PADDING * 2,
+                        left + cellW / 2f, top + cellH / 2f
+                    )
+                } else {
+                    // 合排模式：英文占上半格、中文占下半格，各自居中
+                    drawCellText(
+                        canvas, cell.primary, textPaint,
+                        left + CELL_PADDING, top + CELL_PADDING,
+                        cellW - CELL_PADDING * 2, cellH / 2f - CELL_PADDING * 2,
+                        left + cellW / 2f, top + cellH / 4f
+                    )
+                    drawCellText(
+                        canvas, cell.secondary, textPaint,
+                        left + CELL_PADDING, top + cellH / 2f,
+                        cellW - CELL_PADDING * 2, cellH / 2f - CELL_PADDING * 2,
+                        left + cellW / 2f, top + cellH * 3f / 4f
+                    )
+                }
             }
 
-            doc.finishPage(page)
-        }
-
-        // 空数据时给一张空白页，避免生成 0 页非法 PDF
-        if (pages == 0) {
-            val pageInfo = PdfDocument.PageInfo.Builder(PAGE_W, PAGE_H, 1).create()
-            val page = doc.startPage(pageInfo)
-            for (i in 1 until ROWS) {
-                page.canvas.drawLine(0f, cellH * i, PAGE_W.toFloat(), cellH * i, linePaint)
-            }
-            for (i in 1 until COLS) {
-                page.canvas.drawLine(cellW * i, 0f, cellW * i, PAGE_H.toFloat(), linePaint)
-            }
             doc.finishPage(page)
         }
 
@@ -112,8 +154,8 @@ object CardPdfGenerator {
     }
 
     /**
-     * 在指定单元格里绘制居中文字（英文在上、中文在下）。
-     * 若两侧都有内容，各自占单元格上下两半；只有一侧时占满整个单元格。
+     * 在指定区域内绘制居中文字。
+     * 自动从 54px 逐级缩小字号，直到文本完整落在区域内。
      */
     private fun drawCellText(
         canvas: Canvas,
@@ -127,14 +169,12 @@ object CardPdfGenerator {
         centerY: Float
     ) {
         if (text.isBlank()) return
-        // 外层已经把单元格一分为二来画英文和中文，这里用整个单元格宽度的一半高度区域
-        val usableH = areaH
         var size = 54f
         var layout: StaticLayout? = null
         while (size > 10f) {
             basePaint.textSize = size
             val l = buildLayout(text, basePaint, areaW.toInt())
-            if (l.height <= usableH && l.width <= areaW + 1) {
+            if (l.height <= areaH && l.width <= areaW + 1) {
                 layout = l
                 break
             }
@@ -142,8 +182,7 @@ object CardPdfGenerator {
         }
         val l = layout ?: buildLayout(text, basePaint.apply { textSize = 10f }, areaW.toInt())
         canvas.save()
-        val translateY = centerY - l.height / 2f
-        canvas.translate(areaLeft, translateY)
+        canvas.translate(areaLeft, centerY - l.height / 2f)
         l.draw(canvas)
         canvas.restore()
     }

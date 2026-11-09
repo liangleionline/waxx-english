@@ -1,13 +1,13 @@
 package com.waxx.englishcard
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
-import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -19,11 +19,14 @@ import com.waxx.englishcard.databinding.DialogResultBinding
 import com.waxx.englishcard.databinding.ItemCardRowBinding
 import java.io.File
 
+/**
+ * 主界面：打开即进入左右两栏卡片页（不再有「创建卡片」首页）。
+ * 数据为空时页面没有内容，直接点底部【新增】即可开始录入。
+ */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val cards = mutableListOf<CardItem>()
-    private var editorVisible = false
     private var lastPdf: File? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,37 +36,26 @@ class MainActivity : AppCompatActivity() {
 
         cards.clear()
         cards.addAll(CardStore.load(this))
+        renderList()
 
-        // 启动时：有数据直接进编辑页；没数据只显示创建卡片按钮
-        if (cards.isNotEmpty()) {
-            showEditor()
-        } else {
-            showHome()
-        }
-
-        binding.btnCreateCard.setOnClickListener { showEditor() }
         binding.btnAdd.setOnClickListener { showAddDialog() }
         binding.btnSavePdf.setOnClickListener { doSaveAndGeneratePdf() }
         binding.btnClear.setOnClickListener { confirmClearAll() }
+        binding.btnSettings.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
 
         requestLegacyStoragePermissionIfNeeded()
         checkLastCrash()
     }
 
-    // ---------------- UI 状态 ----------------
-
-    private fun showHome() {
-        editorVisible = false
-        binding.homeContainer.visibility = View.VISIBLE
-        binding.editorContainer.visibility = View.GONE
+    override fun onResume() {
+        super.onResume()
+        // 从设置页返回时刷新统计（每页卡片数随排版模式变化）
+        updateCount()
     }
 
-    private fun showEditor() {
-        editorVisible = true
-        binding.homeContainer.visibility = View.GONE
-        binding.editorContainer.visibility = View.VISIBLE
-        renderList()
-    }
+    // ---------------- 列表渲染 ----------------
 
     private fun renderList() {
         val inflater = LayoutInflater.from(this)
@@ -80,10 +72,9 @@ class MainActivity : AppCompatActivity() {
             binding.listContainer.addView(row.root)
 
             val divider = View(this)
-            val lp = android.widget.LinearLayout.LayoutParams(
+            divider.layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
             )
-            divider.layoutParams = lp
             divider.setBackgroundColor(0xFFEEEEEE.toInt())
             binding.listContainer.addView(divider)
         }
@@ -92,8 +83,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateCount() {
-        val pages = if (cards.isEmpty()) 0 else (cards.size + 15) / 16
-        binding.tvCount.text = "共 ${cards.size} 张卡片 · ${pages} 页 PDF"
+        val mode = AppSettings.pdfLayoutMode(this)
+        val pages = CardPdfGenerator.pageCount(cards.size, mode)
+        val perPage = CardPdfGenerator.cellsPerPage(mode)
+        binding.tvCount.text = "共 ${cards.size} 张卡片 · 每页 $perPage 张 · ${pages} 页 PDF"
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
@@ -238,6 +231,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         persist()
+        val mode = AppSettings.pdfLayoutMode(this)
         binding.btnSavePdf.isEnabled = false
         val progress = android.app.ProgressDialog(this).apply {
             setMessage("正在生成 PDF…")
@@ -250,7 +244,7 @@ class MainActivity : AppCompatActivity() {
             var error: String? = null
             try {
                 val out = File(File(cacheDir, "share").apply { mkdirs() }, CardPdfGenerator.pdfFileName())
-                file = CardPdfGenerator.generate(this, cards.toList(), out)
+                file = CardPdfGenerator.generate(this, cards.toList(), out, mode)
             } catch (t: Throwable) {
                 error = t.message ?: t.javaClass.simpleName
                 CrashLogger.logException(this, "generatePdf failed", t)
@@ -260,7 +254,7 @@ class MainActivity : AppCompatActivity() {
                 binding.btnSavePdf.isEnabled = true
                 if (file != null) {
                     lastPdf = file
-                    showResultDialog(file)
+                    showResultDialog(file, mode)
                 } else {
                     AlertDialog.Builder(this)
                         .setTitle("生成失败")
@@ -272,11 +266,13 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun showResultDialog(pdf: File) {
+    private fun showResultDialog(pdf: File, mode: CardPdfGenerator.PdfLayoutMode) {
         val dialogBinding = DialogResultBinding.inflate(layoutInflater)
         dialogBinding.tvTitle.text = getString(R.string.set_title)
         dialogBinding.tvSub.visibility = View.VISIBLE
-        dialogBinding.tvSub.text = "共 ${cards.size} 张卡片 · ${(cards.size + 15) / 16} 页 · A4 16 格"
+        val pages = CardPdfGenerator.pageCount(cards.size, mode)
+        val modeName = if (mode == CardPdfGenerator.PdfLayoutMode.SPLIT) "英文/中文交替占格" else "每格英文+中文"
+        dialogBinding.tvSub.text = "共 ${cards.size} 张卡片 · $pages 页 · A4 4×4 · $modeName"
 
         val dialog = AlertDialog.Builder(this)
             .setView(dialogBinding.root)
@@ -345,7 +341,7 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("关闭") { _, _ -> CrashLogger.clearLastCrash(this) }
             .setPositiveButton("查看日志") { _, _ ->
                 startActivity(
-                    android.content.Intent(this, CrashDetailActivity::class.java)
+                    Intent(this, CrashDetailActivity::class.java)
                         .putExtra(CrashDetailActivity.EXTRA_CONTENT, log)
                 )
             }
@@ -354,13 +350,5 @@ class MainActivity : AppCompatActivity() {
 
     private fun toast(msg: String) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-    }
-
-    override fun onBackPressed() {
-        if (editorVisible) {
-            showHome()
-        } else {
-            super.onBackPressed()
-        }
     }
 }

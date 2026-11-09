@@ -40,6 +40,11 @@
         </provider>
 
         <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme" />
+
+        <activity
             android:name=".CrashDetailActivity"
             android:exported="false"
             android:theme="@style/AppTheme" />
