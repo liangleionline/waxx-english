@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">英语学习卡片</string>
+    <string name="create_card">创建卡片</string>
+    <string name="add">新增</string>
+    <string name="save_pdf">保存并生成 PDF</string>
+    <string name="clear_all">清空</string>
+    <string name="hint_multiline">奇数行填写英文，偶数行填写中文翻译\n例如：\napple\n苹果\nbanana\n香蕉</string>
+    <string name="hint_edit">第一行英文，第二行中文翻译</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="confirm">确定</string>
+    <string name="share">分享</string>
+    <string name="set_title">单词卡片已生成</string>
+    <string name="empty_tip">暂无卡片内容，无法生成 PDF</string>
+    <string name="app_share_title">分享单词卡片 PDF</string>
+</resources>
