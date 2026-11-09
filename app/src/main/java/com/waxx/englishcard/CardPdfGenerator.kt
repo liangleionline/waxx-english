@@ -153,7 +153,6 @@ object CardPdfGenerator {
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setIncludePad(false)
             .setLineSpacing(0f, 1.05f)
-            .setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE)
             .build()
     }
 
