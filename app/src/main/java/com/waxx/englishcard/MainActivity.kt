@@ -51,8 +51,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // 从设置页返回时刷新统计（每页卡片数随排版模式变化）
-        updateCount()
+        // 从设置页返回时可能发生过导入/覆盖，这里重新对齐一次数据；排版统计也随之刷新
+        val latest = CardStore.load(this)
+        if (latest != cards) {
+            cards.clear()
+            cards.addAll(latest)
+            renderList()
+        } else {
+            updateCount()
+        }
     }
 
     // ---------------- 列表渲染 ----------------
