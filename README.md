@@ -1,5 +1,15 @@
 # waxx-english · 英语学习卡片 PDF 生成器
 
+[![Release](https://img.shields.io/github/v/release/liangleionline/waxx-english?label=version&color=1F6FEB)](https://github.com/liangleionline/waxx-english/releases)
+[![Downloads](https://img.shields.io/github/downloads/liangleionline/waxx-english/total?label=downloads&color=2EA043)](https://github.com/liangleionline/waxx-english/releases)
+[![Latest APK](https://img.shields.io/github/downloads/liangleionline/waxx-english/latest/total?label=latest%20APK&color=2EA043)](https://github.com/liangleionline/waxx-english/releases/latest)
+[![Last commit](https://img.shields.io/github/last-commit/liangleionline/waxx-english)](https://github.com/liangleionline/waxx-english/commits/main)
+[![Repo size](https://img.shields.io/github/repo-size/liangleionline/waxx-english)](https://github.com/liangleionline/waxx-english)
+[![Stars](https://img.shields.io/github/stars/liangleionline/waxx-english?style=social)](https://github.com/liangleionline/waxx-english/stargazers)
+[![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)](#)
+[![minSdk](https://img.shields.io/badge/minSdk-24-blue)](#)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-7F52FF?logo=kotlin&logoColor=white)](#)
+
 一款纯离线 Android App：把「英文 / 中文翻译」成对录入，一键生成 **A4 纸 4×4 共 16 格、无外边框、可裁剪**的单词卡片 PDF，并可通过系统分享直接发到微信。
 
 - 包名：`com.waxx.englishcard`
@@ -130,3 +140,38 @@ app/src/main/assets/NotoSansSC-Regular.otf   # 内嵌中文字体，保证 PDF �
 - 编辑弹窗对中文只按「第二行起合并为一段」处理，不支持中文内部换行。
 - 暂不支持卡片排序、JSON 导入导出、PDF 预览。
 - 未做深色模式适配。
+
+---
+
+## 五、访问与下载统计
+
+顶部徽章里这几项是**实时**的（shields.io 直接读 GitHub 数据，刷新页面就会更新）：
+
+| 徽章 | 含义 |
+|---|---|
+| `version` | 最新 Release 版本号 |
+| `downloads` | 全部 Release 的 APK 累计下载次数 |
+| `latest APK` | 只统计最新那个 Release 的下载次数 |
+| `last-commit` / `repo-size` / `stars` | 最近提交时间 / 仓库体积 / Star 数 |
+
+> shields.io 没有官方的「仓库访问量（views）」徽章，访问量和克隆量只能在 GitHub 后台或 API 里看。
+
+### 当前快照（2026-11-10）
+
+| 指标 | 数值 |
+|---|---|
+| 仓库访问量（近 14 天） | 0 次 / 0 独立访客 |
+| 仓库克隆（近 14 天） | 0 次 / 0 独立克隆 |
+| APK 累计下载 | 5 次 |
+| ├ v1.0.3 | 2 次 |
+| ├ v1.0.2 | 1 次 |
+| └ v1.0.1 | 2 次 |
+
+> Release 只保留最近 3 个版本；更早的 v1.0.0 已下线 Release（`v1.0.0` tag 仍保留，可随时从源码重建）。
+
+> GitHub 的 Traffic 数据只保留**最近 14 天**的滚动窗口，且只对仓库有 push 权限的账号可见。
+
+### 查看方式
+
+1. **网页**：仓库 `Insights → Traffic` 看访问/克隆曲线；Release 页每个资产旁会显示 `Downloads` 次数。
+2. **命令行**：仓库自带 `scripts/github_stats.sh`，一条命令打印访问、克隆、各版本下载量（需要 token，见脚本内说明）。
