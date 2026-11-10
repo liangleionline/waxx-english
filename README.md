@@ -175,3 +175,24 @@ app/src/main/assets/NotoSansSC-Regular.otf   # 内嵌中文字体，保证 PDF �
 
 1. **网页**：仓库 `Insights → Traffic` 看访问/克隆曲线；Release 页每个资产旁会显示 `Downloads` 次数。
 2. **命令行**：仓库自带 `scripts/github_stats.sh`，一条命令打印访问、克隆、各版本下载量（需要 token，见脚本内说明）。
+
+---
+
+## 六、发版与版本保留策略
+
+**规则：每次发版后只保留最新 3 个 Release，更早的 Release 删除。**
+
+- 保留范围：最新的 3 个版本（含 APK 资产），例如当前为 v1.0.1 / v1.0.2 / v1.0.3。
+- 删除范围：第 4 个及更早的 Release（连同其 APK 资产）。
+- **tag 不删**：源码仍可从 tag 检出重建，避免历史版本彻底消失。
+- 顺序：先删 Release 再考虑 tag，避免 Release 变成 `untagged-xxx` 残留。
+
+发版后执行（默认只打印计划，加 `--apply` 才真删）：
+
+```bash
+GITHUB_TOKEN=xxx bash scripts/prune_releases.sh          # 预览
+GITHUB_TOKEN=xxx bash scripts/prune_releases.sh --apply  # 执行
+KEEP=3 为默认值，可用 KEEP=5 临时调整
+```
+
+> 注意：被删除 Release 的下载次数会从「累计下载」徽章里一起消失，这是正常现象，不代表数据丢失被统计过。
