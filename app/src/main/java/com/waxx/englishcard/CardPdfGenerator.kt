@@ -18,6 +18,7 @@ import java.io.File
  * - A4 纸张，无页边距；
  * - 内部 3 条横线 + 3 条竖线，全部顶到纸张边缘，整体无外边框；
  * - 单元格内容水平居中 + 垂直居中，长文本自动换行并按需缩小字号；
+ * - 英文单词不跨行拆断：单词本身放不下时缩小字号，而不是把单词切成两行；
  * - 每页 16 格，自动分页；填充顺序为从上到下、从左到右。
  *
  * 两种排版模式（设置页可切换）：
@@ -171,9 +172,37 @@ object CardPdfGenerator {
         return outFile
     }
 
+    /** 起始字号与最小字号（px）：从 54 起逐级缩小，最小到 8。 */
+    private const val TEXT_SIZE_START = 54f
+    private const val TEXT_SIZE_MIN = 8f
+    private const val TEXT_SIZE_STEP = 2f
+
+    /**
+     * 英文单词（含数字、连字符、撇号等）的匹配：用于保证「一个单词绝不跨行断开」。
+     * 中文没有空格，按字符断行是可接受的，因此不纳入此约束。
+     */
+    private val LATIN_TOKEN = Regex("[A-Za-z0-9\u00C0-\u017F'’._-]+")
+
+    /** 文本中最宽的那个「不可拆分单元」的宽度；只有中文时返回 0（不做约束）。 */
+    private fun maxUnbreakableTokenWidth(text: String, paint: TextPaint): Float {
+        var max = 0f
+        text.split('\n').forEach { line ->
+            LATIN_TOKEN.findAll(line).forEach { m ->
+                val w = paint.measureText(m.value)
+                if (w > max) max = w
+            }
+        }
+        return max
+    }
+
     /**
      * 在指定区域内绘制居中文字。
-     * 自动从 54px 逐级缩小字号，直到文本完整落在区域内。
+     *
+     * 自适应规则：
+     * 1. 从 54px 起，以 2px 为步长缩小字号，直到文本完整落在区域内（宽、高均不溢出）；
+     * 2. 同时要求**最宽的那个英文单词本身不超过单元格可用宽度**，
+     *    避免 StaticLayout 把一个单词硬切成两行——放不下就继续缩小字号；
+     * 3. 缩到 8px 仍放不下时按 8px 输出（极端长单词的兜底）。
      */
     private fun drawCellText(
         canvas: Canvas,
@@ -187,18 +216,23 @@ object CardPdfGenerator {
         centerY: Float
     ) {
         if (text.isBlank()) return
-        var size = 54f
+        var size = TEXT_SIZE_START
         var layout: StaticLayout? = null
-        while (size > 10f) {
+        while (size >= TEXT_SIZE_MIN) {
             basePaint.textSize = size
-            val l = buildLayout(text, basePaint, areaW.toInt())
-            if (l.height <= areaH && l.width <= areaW + 1) {
-                layout = l
+            val candidate = buildLayout(text, basePaint, areaW.toInt())
+            val widestWord = maxUnbreakableTokenWidth(text, basePaint)
+            if (candidate.height <= areaH &&
+                candidate.width <= areaW + 1 &&
+                widestWord <= areaW
+            ) {
+                layout = candidate
                 break
             }
-            size -= 2f
+            size -= TEXT_SIZE_STEP
         }
-        val l = layout ?: buildLayout(text, basePaint.apply { textSize = 10f }, areaW.toInt())
+        basePaint.textSize = size.coerceAtLeast(TEXT_SIZE_MIN)
+        val l = layout ?: buildLayout(text, basePaint, areaW.toInt())
         canvas.save()
         canvas.translate(areaLeft, centerY - l.height / 2f)
         l.draw(canvas)
